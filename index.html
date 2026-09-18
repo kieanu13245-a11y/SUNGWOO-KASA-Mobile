@@ -128,6 +128,12 @@ function renderRules(title,rows){
   if(!a.length)return '';
   return '<div class="pc-section"><div class="pc-section-title">'+esc(title)+'</div>'+a.map(d=>'<div class="rule '+esc(d.tone||'info')+'"><div class="k">'+esc(d.label||'')+'</div><div class="v">'+esc(moneyText(d.value||''))+'</div></div>').join('')+'</div>';
 }
+function legacyPriceCard(d){
+  const first=Array.isArray(d?.priceCandidates)?d.priceCandidates[0]:null;
+  if(!first)return null;
+  const note=String(first.note||'').trim();
+  return {title:(first.variants||[]).join(' · ')||'기존 가격표',price:String(first.price||''),details:note?[{label:note,value:'',tone:'info'}]:[],notice:'이전 조회 결과 · 신규 가격카드는 다시 조회하면 적용'};
+}
 function renderPriceCard(c){
   if(!c)return '<div class="pc-head"><div class="pc-title">가격표 매칭 없음</div></div>';
   const tags=Array.isArray(c.tags)?c.tags.filter(Boolean):[];
@@ -156,7 +162,7 @@ function render(d,fromHistory=false){
   const v=d.vehicle||{};
   const isStarex=String(v['차명']||'').includes('스타렉스');
   const regHtml=(isStarex&&v['최초등록일'])?'<div class="kv"><small>최초등록일</small><b>'+esc(v['최초등록일'])+'</b></div>':'';
-  $('#result').innerHTML='<div class="plate">'+esc(v['등록번호']||d.plate||'-')+'</div><div class="car">'+esc(v['차명']||'차명 없음')+'</div><div class="grid"><div class="kv"><small>연식</small><b>'+esc(v['연식']||'-')+'</b></div><div class="kv"><small>주행거리</small><b>'+esc(v['주행거리']||'-')+'</b></div><div class="kv"><small>연료</small><b>'+esc(v['연료']||'-')+'</b></div><div class="kv"><small>엔진</small><b>'+esc(v['원동기형식']||'-')+'</b></div>'+regHtml+'</div><div class="muted" style="margin-top:10px">VIN '+esc(v['차대번호']||'-')+' · '+esc(v['색상']||'')+'</div>'+renderPriceCard(d.priceCard);
+  $('#result').innerHTML='<div class="plate">'+esc(v['등록번호']||d.plate||'-')+'</div><div class="car">'+esc(v['차명']||'차명 없음')+'</div><div class="grid"><div class="kv"><small>연식</small><b>'+esc(v['연식']||'-')+'</b></div><div class="kv"><small>주행거리</small><b>'+esc(v['주행거리']||'-')+'</b></div><div class="kv"><small>연료</small><b>'+esc(v['연료']||'-')+'</b></div><div class="kv"><small>엔진</small><b>'+esc(v['원동기형식']||'-')+'</b></div>'+regHtml+'</div><div class="muted" style="margin-top:10px">VIN '+esc(v['차대번호']||'-')+' · '+esc(v['색상']||'')+'</div>'+renderPriceCard(d.priceCard||legacyPriceCard(d));
   $('#result').classList.remove('hidden');
   setStatus(fromHistory?'오늘 조회 내역을 불러왔습니다.':'조회 완료 · NAS KASA 결과를 받았습니다.','ok');
 }
