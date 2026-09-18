@@ -10,7 +10,7 @@
 </style>
 </head>
 <body><div class="wrap">
-<div class="head"><h1>SUNGWOO KASA 모바일 조회</h1><p>차량번호 입력 → 사무실 PC KASA 자동조회 → 가격 반환</p></div>
+<div class="head"><h1>SUNGWOO KASA 모바일 조회</h1><p>여러 명이 동시에 조회해도 순서대로 자동 처리</p></div>
 <div class="card"><div class="row"><input id="plate" class="grow" placeholder="차량번호 예: 24도5843" autocomplete="off"><button id="lookup">조회</button></div><div id="lookupStatus" class="status">준비 완료 · 차량번호를 입력하세요.</div></div>
 <div id="result" class="card hidden"></div>
 </div>
@@ -34,7 +34,52 @@ async function api(path,opt={}){
 function priceParts(raw){let m=String(raw||'').match(/^\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*(~)?\s*$/);if(m)return{steel:m[1],alloy:m[2],open:!!m[3]};m=String(raw||'').match(/^\s*(\d+(?:\.\d+)?)\s*(~)?\s*$/);if(m)return{steel:m[1],alloy:m[1],open:!!m[2]};return null}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function render(d){if(d.status!=='ok'){setStatus('조회 실패 · '+(d.error||'알 수 없는 오류'),'bad');return}const v=d.vehicle||{},cs=Array.isArray(d.priceCandidates)?d.priceCandidates:[],first=cs[0],p=first?priceParts(first.price):null;const steel=p?`${p.steel}만원${p.open?' 이상':''}`:'-',alloy=p?`${p.alloy}만원${p.open?' 이상':''}`:'-';$('#result').innerHTML=`<div class="plate">${esc(v['등록번호']||d.plate||'-')}</div><div class="car">${esc(v['차명']||'차명 없음')}</div><div class="grid"><div class="kv"><small>연식</small><b>${esc(v['연식']||'-')}</b></div><div class="kv"><small>주행거리</small><b>${esc(v['주행거리']||'-')}</b></div><div class="kv"><small>연료</small><b>${esc(v['연료']||'-')}</b></div><div class="kv"><small>엔진</small><b>${esc(v['원동기형식']||'-')}</b></div></div><div class="muted" style="margin-top:10px">VIN ${esc(v['차대번호']||'-')} · ${esc(v['색상']||'')}</div><div style="font-weight:850;margin-top:16px">${first?esc((first.variants||[]).join(' · ')):'가격표 후보 없음'}</div><div class="prices"><div class="price steel"><small>철휠</small><strong>${esc(steel)}</strong></div><div class="price alloy"><small>알루미늄휠</small><strong>${esc(alloy)}</strong></div></div>${cs.slice(1,5).map((x,i)=>{const q=priceParts(x.price);return `<div class="cand"><b>${i+2}. ${esc((x.variants||[]).join(' · '))}</b><div class="muted">${q?`철 ${esc(q.steel)} / 알루미늄 ${esc(q.alloy)}만원`:esc(x.price||'-')}</div></div>`}).join('')}`;$('#result').classList.remove('hidden');setStatus('조회 완료 · PC KASA 결과를 받았습니다.','ok')}
-async function lookup(){const plate=$('#plate').value.replace(/\s+/g,'').trim();if(!plate)return setStatus('차량번호를 입력하세요.','bad');const my=++pollToken;$('#result').classList.add('hidden');try{setStatus('사무실 PC로 조회 요청 전송 중…');const r=await api('/request',{method:'POST',body:JSON.stringify({plate,source:'github-mobile-v0.5.2'})});const id=String(r.requestId||'');if(!id)throw new Error('서버에서 requestId를 받지 못했습니다.');setStatus('PC KASA 조회 대기 중…');const started=Date.now();while(my===pollToken&&Date.now()-started<90000){await sleep(1500);try{const q=await api('/result?id='+encodeURIComponent(id),{method:'GET'});if(q?.pending)continue;if(q?.result){render(q.result);return}}catch(e){if(e.status===404)continue;throw e}}if(my===pollToken)setStatus('90초 동안 응답이 없습니다. 사무실 PC에서 KASA 페이지가 열려 있는지 확인하세요.','bad')}catch(e){setStatus(String(e.message||e),'bad')}}
+async function lookup(){
+  const plate=$('#plate').value.replace(/\s+/g,'').trim();
+  if(!plate)return setStatus('차량번호를 입력하세요.','bad');
+  const btn=$('#lookup');
+  const my=++pollToken;
+  $('#result').classList.add('hidden');
+  btn.disabled=true;
+  try{
+    setStatus('조회 요청 전송 중…');
+    const r=await api('/request',{method:'POST',body:JSON.stringify({plate,source:'github-mobile-v0.6.0'})});
+    const id=String(r.requestId||'');
+    if(!id)throw new Error('서버에서 requestId를 받지 못했습니다.');
+
+    if(r.stage==='processing') setStatus('PC KASA 조회 시작 중…');
+    else if(Number(r.ahead||0)>0) setStatus(`조회 대기 중 · 앞에 ${r.ahead}건`);
+    else setStatus('조회 대기 중 · 곧 시작됩니다.');
+
+    const started=Date.now();
+    while(my===pollToken&&Date.now()-started<5*60*1000){
+      await sleep(1200);
+      let q;
+      try{
+        q=await api('/result?id='+encodeURIComponent(id),{method:'GET'});
+      }catch(e){
+        if(e.status===404)continue;
+        throw e;
+      }
+
+      if(q?.result){
+        render(q.result);
+        return;
+      }
+
+      if(q?.pending){
+        if(q.stage==='processing') setStatus('PC KASA 조회 중…');
+        else if(Number(q.ahead||0)>0) setStatus(`조회 대기 중 · 앞에 ${q.ahead}건`);
+        else setStatus('조회 대기 중 · 곧 시작됩니다.');
+      }
+    }
+    if(my===pollToken)setStatus('5분 동안 결과가 없습니다. 사무실 PC/KASA 상태를 확인하세요.','bad');
+  }catch(e){
+    setStatus(String(e.message||e),'bad');
+  }finally{
+    if(my===pollToken)btn.disabled=false;
+  }
+}
 setStatus('준비 완료 · 차량번호를 입력하세요.','ok');
 $('#lookup').onclick=lookup;
 $('#plate').addEventListener('keydown',e=>{if(e.key==='Enter')lookup()});
