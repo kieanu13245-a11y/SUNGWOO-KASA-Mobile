@@ -3,7 +3,10 @@ import { DurableObject } from "cloudflare:workers";
 const ALLOWED_ORIGIN = "https://kieanu13245-a11y.github.io";
 const REQUEST_MAX_AGE_MS = 10 * 60 * 1000;
 const CLAIM_TTL_MS = 45 * 1000;
-const DUPLICATE_WINDOW_MS = 3000;\nconst AGENT_ONLINE_MS = 20 * 1000;\nconst HISTORY_LIMIT = 200;\nconst HISTORY_RETENTION_DAYS = 31;
+const DUPLICATE_WINDOW_MS = 3000;
+const AGENT_ONLINE_MS = 20 * 1000;
+const HISTORY_LIMIT = 200;
+const HISTORY_RETENTION_DAYS = 31;
 
 function json(data, status = 200, origin = "") {
   const headers = new Headers({
@@ -343,7 +346,8 @@ export class KasaRelay extends DurableObject {
         vehicle: body.vehicle && typeof body.vehicle === "object" ? body.vehicle : {},
         priceCandidates: Array.isArray(body.priceCandidates) ? body.priceCandidates.slice(0, 10) : []
       };
-      await this.ctx.storage.put(`result:${requestId}`, result);\n      await this.addHistory(result);
+      await this.ctx.storage.put(`result:${requestId}`, result);
+      await this.addHistory(result);
 
       entry.status = result.status === "ok" ? "done" : "error";
       entry.completedAt = result.completedAt;
