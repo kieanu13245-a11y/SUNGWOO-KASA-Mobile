@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SUNGWOO KASA Queue Test</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;color:#111827;background:#f3f6fa}*{box-sizing:border-box}body{margin:0}.wrap{max-width:760px;margin:0 auto;padding:18px}.card{background:#fff;border:1px solid #dbe3ee;border-radius:14px;padding:14px;margin-bottom:12px}.row{display:flex;gap:8px;flex-wrap:wrap}textarea,button{font:inherit;border-radius:10px}textarea{width:100%;min-height:150px;padding:12px;border:1px solid #aeb9c8;font-size:15px}button{border:0;padding:11px 14px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer}.secondary{background:#475569}.muted{font-size:12px;color:#64748b}.status{padding:10px;border-radius:10px;background:#eff6ff;color:#1d4ed8;margin-top:8px}.ok{background:#f0fdf4;color:#166534}.bad{background:#fef2f2;color:#b91c1c}.item{border-top:1px solid #e5e7eb;padding:10px 0}.item:first-child{border-top:0}.plate{font-weight:900}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;word-break:break-all}.pill{display:inline-block;padding:3px 7px;border-radius:999px;background:#e2e8f0;font-size:11px;margin-left:6px}
+</style>
+</head>
+<body><div class="wrap">
+<div class="card"><h2 style="margin:0 0 8px">SUNGWOO KASA 다중요청 테스트</h2><div class="muted">여러 휴대폰 대신 한 화면에서 여러 차량번호를 동시에 요청해 FIFO 대기열과 자동 순차처리를 확인합니다.</div></div>
+<div class="card">
+<label><b>차량번호</b> <span class="muted">한 줄에 하나, 최대 10개</span></label>
+<textarea id="plates" placeholder="24도5843&#10;12가3456&#10;34나7890"></textarea>
+<div class="row" style="margin-top:10px">
+<button id="run">동시 요청 시작</button>
+<button id="health" class="secondary">서버 상태 확인</button>
+</div>
+<div id="server" class="status">대기 중</div>
+</div>
+<div class="card"><b>요청 상태</b><div id="results" style="margin-top:8px"></div></div>
+</div>
+<script>
+(()=>{
+const API='https://sungwoo-kasa-relay.kieanu13245.workers.dev';
+const $=s=>document.querySelector(s);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let stopToken=0;
+async function api(path,opt={}){
+ const h=new Headers(opt.headers||{});
+ if(opt.body!=null&&!h.has('Content-Type'))h.set('Content-Type','application/json');
+ const r=await fetch(API+path,{...opt,headers:h,cache:'no-store'});
+ const raw=await r.text(); let d={};
+ try{d=raw?JSON.parse(raw):{}}catch(_){d={raw}}
+ if(!r.ok){const e=new Error(d.error||raw||('HTTP '+r.status));e.status=r.status;throw e}
+ return d;
+}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function setServer(d,type=''){
+ $('#server').className='status'+(type?' '+type:'');
+ $('#server').textContent=typeof d==='string'?d:`Worker v${d.version||'?'} · 대기 ${d.queueLength||0}건 · 처리중 ${d.processing?'예':'아니오'}`;
+}
+async function health(){try{setServer(await api('/health'),'ok')}catch(e){setServer('서버 오류 · '+e.message,'bad')}}
+function draw(items){
+ $('#results').innerHTML=items.map(x=>`<div class="item" id="r-${x.localId}">
+ <span class="plate">${esc(x.plate)}</span><span class="pill">${esc(x.state)}</span>
+ <div class="muted">${esc(x.detail||'')}</div>
+ <div class="mono">${esc(x.requestId||'')}</div>
+ </div>`).join('');
+}
+function update(items,x,state,detail){
+ x.state=state;x.detail=detail||'';draw(items);
+}
+async function poll(items,x,token){
+ const started=Date.now();
+ while(token===stopToken && Date.now()-started<5*60*1000){
+   await sleep(1000);
+   try{
+     const q=await api('/result?id='+encodeURIComponent(x.requestId));
+     if(q.result){update(items,x,q.result.status==='ok'?'완료':'오류',q.result.status==='ok'?'결과 수신 완료':(q.result.error||'조회 오류'));await health();return}
+     if(q.pending){
+       if(q.stage==='processing') update(items,x,'처리중','PC KASA 조회 중');
+       else update(items,x,'대기',Number(q.ahead||0)>0?`앞에 ${q.ahead}건`:'곧 시작');
+     }
+   }catch(e){
+     if(e.status!==404){update(items,x,'오류',e.message);return}
+   }
+ }
+ if(token===stopToken) update(items,x,'시간초과','5분 내 결과 없음');
+}
+$('#health').onclick=health;
+$('#run').onclick=async()=>{
+ const plates=$('#plates').value.split(/\r?\n/).map(x=>x.replace(/\s+/g,'').trim()).filter(Boolean).slice(0,10);
+ if(!plates.length){setServer('차량번호를 한 개 이상 입력하세요.','bad');return}
+ const token=++stopToken;
+ const items=plates.map((plate,i)=>({localId:i+1,plate,state:'전송중',detail:'',requestId:''}));
+ draw(items);
+ $('#run').disabled=true;
+ try{
+   const responses=await Promise.all(items.map(async x=>{
+     try{
+       const r=await api('/request',{method:'POST',body:JSON.stringify({plate:x.plate,source:'queue-test-v0.6.0'})});
+       x.requestId=String(r.requestId||'');
+       if(!x.requestId) throw new Error('requestId 없음');
+       x.state=r.stage==='processing'?'처리중':'대기';
+       x.detail=Number(r.ahead||0)>0?`앞에 ${r.ahead}건`:'곧 시작';
+       return x;
+     }catch(e){x.state='오류';x.detail=e.message;return x}
+   }));
+   draw(items); await health();
+   await Promise.all(responses.filter(x=>x.requestId).map(x=>poll(items,x,token)));
+ } finally { if(token===stopToken) $('#run').disabled=false; }
+};
+health();
+})();
+</script>
+</body></html>
