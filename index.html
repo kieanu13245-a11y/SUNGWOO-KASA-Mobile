@@ -152,7 +152,7 @@ function renderPriceCard(c){
   }
   const details=Array.isArray(c.details)?c.details:[];
   html+=renderRules('참고 가격 / 조건',details.filter(x=>(x.tone||'info')==='info'));
-  html+=renderRules('가격 조정',details.filter(x=>x.tone==='down'||x.tone==='up'));
+
   html+=renderRules('특수 상태',details.filter(x=>x.tone==='special'));
   if(c.notice)html+='<div class="notice">⚠ '+esc(c.notice)+'</div>';
   return html;
