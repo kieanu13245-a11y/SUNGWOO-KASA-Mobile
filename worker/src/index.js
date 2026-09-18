@@ -3,7 +3,7 @@ import { DurableObject } from "cloudflare:workers";
 const ALLOWED_ORIGIN = "https://kieanu13245-a11y.github.io";
 const REQUEST_MAX_AGE_MS = 10 * 60 * 1000;
 const CLAIM_TTL_MS = 45 * 1000;
-const DUPLICATE_WINDOW_MS = 3000;
+const DUPLICATE_WINDOW_MS = 3000;\nconst AGENT_ONLINE_MS = 20 * 1000;\nconst HISTORY_LIMIT = 200;\nconst HISTORY_RETENTION_DAYS = 31;
 
 function json(data, status = 200, origin = "") {
   const headers = new Headers({
@@ -37,6 +37,16 @@ function ageMs(iso) {
   return Number.isFinite(t) ? Date.now() - t : Infinity;
 }
 
+function kstDateKey(value = Date.now()) {
+  const t = typeof value === "number" ? value : Date.parse(String(value || ""));
+  const ms = Number.isFinite(t) ? t : Date.now();
+  return new Date(ms + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function validDateKey(v) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(v || ""));
+}
+
 export class KasaRelay extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
@@ -59,6 +69,26 @@ export class KasaRelay extends DurableObject {
 
   async putEntry(entry) {
     await this.ctx.storage.put(`request:${entry.requestId}`, entry);
+  }
+
+  async getHistory(dateKey) {
+    const items = await this.ctx.storage.get(`history:${dateKey}`);
+    return Array.isArray(items) ? items.filter(Boolean) : [];
+  }
+
+  async addHistory(result) {
+    const dateKey = kstDateKey(result.completedAt);
+    let items = await this.getHistory(dateKey);
+    items = items.filter(x => String(x?.requestId || "") !== String(result.requestId || ""));
+    items.push({
+      ...result,
+      savedAt: new Date().toISOString()
+    });
+    if (items.length > HISTORY_LIMIT) items = items.slice(-HISTORY_LIMIT);
+    await this.ctx.storage.put(`history:${dateKey}`, items);
+
+    const oldKey = kstDateKey(Date.now() - HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    if (oldKey !== dateKey) await this.ctx.storage.delete(`history:${oldKey}`);
   }
 
   async activeEntry() {
@@ -120,13 +150,72 @@ export class KasaRelay extends DurableObject {
     const url = new URL(request.url);
     const path = url.pathname;
 
+    if (path === "/agent-status" && request.method === "POST") {
+      let body = {};
+      try { body = await request.json(); }
+      catch (_) { return json({ ok: false, error: "JSON 형식이 올바르지 않습니다." }, 400); }
+
+      const agent = {
+        agentId: String(body.agentId || "nas-main").slice(0, 60),
+        host: String(body.host || "sungwoomotors").slice(0, 80),
+        version: String(body.version || "").slice(0, 30),
+        browser: String(body.browser || "").slice(0, 30),
+        kasaReady: !!body.kasaReady,
+        busy: !!body.busy,
+        currentPlate: normalizePlate(body.currentPlate || ""),
+        queueLength: Math.max(0, Number(body.queueLength || 0)),
+        lastSuccessAt: String(body.lastSuccessAt || "").slice(0, 40),
+        lastSuccessPlate: normalizePlate(body.lastSuccessPlate || ""),
+        lastError: String(body.lastError || "").slice(0, 500),
+        pageUrl: String(body.pageUrl || "").slice(0, 500),
+        seenAt: new Date().toISOString()
+      };
+      await this.ctx.storage.put("agentStatus", agent);
+      return json({ ok: true, seenAt: agent.seenAt });
+    }
+
+    if (path === "/status" && request.method === "GET") {
+      const agent = (await this.ctx.storage.get("agentStatus")) || null;
+      const lastSeenAt = agent?.seenAt || "";
+      const online = !!agent && ageMs(lastSeenAt) <= AGENT_ONLINE_MS;
+      const queue = await this.cleanQueue(await this.getQueue());
+      const { entry: active } = await this.activeEntry();
+      return json({
+        ok: true,
+        online,
+        lastSeenAt,
+        kasaReady: online && !!agent?.kasaReady,
+        browser: online ? String(agent?.browser || "") : "",
+        busy: online && (!!agent?.busy || !!active),
+        currentPlate: online ? String(agent?.currentPlate || active?.plate || "") : "",
+        queueLength: queue.length,
+        lastSuccessAt: String(agent?.lastSuccessAt || ""),
+        lastSuccessPlate: String(agent?.lastSuccessPlate || ""),
+        lastError: online ? String(agent?.lastError || "") : "",
+        agentVersion: String(agent?.version || ""),
+        host: String(agent?.host || "")
+      });
+    }
+
+    if (path === "/history" && request.method === "GET") {
+      const requested = String(url.searchParams.get("date") || "").trim();
+      const dateKey = validDateKey(requested) ? requested : kstDateKey();
+      const items = await this.getHistory(dateKey);
+      return json({
+        ok: true,
+        date: dateKey,
+        count: items.length,
+        items: items.slice().reverse()
+      });
+    }
+
     if (path === "/health" && request.method === "GET") {
       const queue = await this.cleanQueue(await this.getQueue());
       const { entry: active } = await this.activeEntry();
       return json({
         ok: true,
         service: "SUNGWOO KASA Relay",
-        version: "1.2.0",
+        version: "1.3.0",
         queueLength: queue.length,
         processing: !!active,
         now: new Date().toISOString()
@@ -254,7 +343,7 @@ export class KasaRelay extends DurableObject {
         vehicle: body.vehicle && typeof body.vehicle === "object" ? body.vehicle : {},
         priceCandidates: Array.isArray(body.priceCandidates) ? body.priceCandidates.slice(0, 10) : []
       };
-      await this.ctx.storage.put(`result:${requestId}`, result);
+      await this.ctx.storage.put(`result:${requestId}`, result);\n      await this.addHistory(result);
 
       entry.status = result.status === "ok" ? "done" : "error";
       entry.completedAt = result.completedAt;
