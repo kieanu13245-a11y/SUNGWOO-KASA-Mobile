@@ -5,10 +5,19 @@
   "compatibility_date": "2026-09-18",
   "durable_objects": {
     "bindings": [
-      { "name": "KASA_RELAY", "class_name": "KasaRelay" }
+      {
+        "name": "KASA_RELAY",
+        "class_name": "KasaRelay"
+      }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["KasaRelay"] }
-  ]
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "KasaRelay"
+      ]
+    }
+  ],
+  "keep_vars": true
 }
