@@ -218,7 +218,7 @@ export class KasaRelay extends DurableObject {
       return json({
         ok: true,
         service: "SUNGWOO KASA Relay",
-        version: "1.3.0",
+        version: "1.3.1",
         queueLength: queue.length,
         processing: !!active,
         now: new Date().toISOString()
@@ -337,13 +337,14 @@ export class KasaRelay extends DurableObject {
       if (!entry) return json({ ok: false, error: "요청을 찾을 수 없습니다." }, 404);
 
       const result = {
-        version: 2,
+        version: Math.max(3, Number(body.version || 3)),
         requestId,
         plate: normalizePlate(body.plate || entry.plate),
         status: body.status === "ok" ? "ok" : "error",
         completedAt: body.completedAt || new Date().toISOString(),
         error: String(body.error || "").slice(0, 1000),
         vehicle: body.vehicle && typeof body.vehicle === "object" ? body.vehicle : {},
+        priceCard: body.priceCard && typeof body.priceCard === "object" && !Array.isArray(body.priceCard) ? body.priceCard : null,
         priceCandidates: Array.isArray(body.priceCandidates) ? body.priceCandidates.slice(0, 10) : []
       };
       await this.ctx.storage.put(`result:${requestId}`, result);
