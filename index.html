@@ -80,7 +80,7 @@ function moneyText(raw){
   return s;
 }
 function historyPriceText(item){
-  const c=item?.priceCard;
+  const c=item?.priceCard || (Array.isArray(item?.priceCandidates)?item.priceCandidates[0]?.priceCard:null);
   if(c){
     if(c.price)return '가격 '+moneyText(c.price);
     const cmp=Array.isArray(c.comparison)?c.comparison:[];
@@ -162,7 +162,7 @@ function render(d,fromHistory=false){
   const v=d.vehicle||{};
   const isStarex=String(v['차명']||'').includes('스타렉스');
   const regHtml=(isStarex&&v['최초등록일'])?'<div class="kv"><small>최초등록일</small><b>'+esc(v['최초등록일'])+'</b></div>':'';
-  $('#result').innerHTML='<div class="plate">'+esc(v['등록번호']||d.plate||'-')+'</div><div class="car">'+esc(v['차명']||'차명 없음')+'</div><div class="grid"><div class="kv"><small>연식</small><b>'+esc(v['연식']||'-')+'</b></div><div class="kv"><small>주행거리</small><b>'+esc(v['주행거리']||'-')+'</b></div><div class="kv"><small>연료</small><b>'+esc(v['연료']||'-')+'</b></div><div class="kv"><small>엔진</small><b>'+esc(v['원동기형식']||'-')+'</b></div>'+regHtml+'</div><div class="muted" style="margin-top:10px">VIN '+esc(v['차대번호']||'-')+' · '+esc(v['색상']||'')+'</div>'+renderPriceCard(d.priceCard||legacyPriceCard(d));
+  $('#result').innerHTML='<div class="plate">'+esc(v['등록번호']||d.plate||'-')+'</div><div class="car">'+esc(v['차명']||'차명 없음')+'</div><div class="grid"><div class="kv"><small>연식</small><b>'+esc(v['연식']||'-')+'</b></div><div class="kv"><small>주행거리</small><b>'+esc(v['주행거리']||'-')+'</b></div><div class="kv"><small>연료</small><b>'+esc(v['연료']||'-')+'</b></div><div class="kv"><small>엔진</small><b>'+esc(v['원동기형식']||'-')+'</b></div>'+regHtml+'</div><div class="muted" style="margin-top:10px">VIN '+esc(v['차대번호']||'-')+' · '+esc(v['색상']||'')+'</div>'+renderPriceCard(d.priceCard||(Array.isArray(d.priceCandidates)?d.priceCandidates[0]?.priceCard:null)||legacyPriceCard(d));
   $('#result').classList.remove('hidden');
   setStatus(fromHistory?'오늘 조회 내역을 불러왔습니다.':'조회 완료 · NAS KASA 결과를 받았습니다.','ok');
 }
@@ -175,7 +175,7 @@ async function lookup(){
   btn.disabled=true;
   try{
     setStatus('조회 요청 전송 중…');
-    const r=await api('/request',{method:'POST',body:JSON.stringify({plate,source:'github-mobile-v0.8.0'})});
+    const r=await api('/request',{method:'POST',body:JSON.stringify({plate,source:'github-mobile-v0.8.1'})});
     const id=String(r.requestId||'');
     if(!id)throw new Error('서버에서 requestId를 받지 못했습니다.');
 
