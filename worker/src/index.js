@@ -19,7 +19,7 @@ function corsPreflight(request) {
   const origin = request.headers.get("Origin") || "";
   const headers = new Headers({
     "access-control-allow-methods": "GET,POST,OPTIONS",
-    "access-control-allow-headers": "Content-Type,X-KASA-Key",
+    "access-control-allow-headers": "Content-Type",
     "access-control-max-age": "86400"
   });
   if (origin === ALLOWED_ORIGIN) headers.set("access-control-allow-origin", origin);
@@ -41,7 +41,7 @@ export class KasaRelay extends DurableObject {
     const path = url.pathname;
 
     if (path === "/health" && request.method === "GET") {
-      return json({ ok: true, service: "SUNGWOO KASA Relay", version: "1.0.0", now: new Date().toISOString() });
+      return json({ ok: true, service: "SUNGWOO KASA Relay", version: "1.1.0", now: new Date().toISOString() });
     }
 
     if (path === "/request" && request.method === "POST") {
@@ -107,11 +107,6 @@ export class KasaRelay extends DurableObject {
       return json({ ok: false, pending: false, error: "결과를 찾을 수 없습니다." }, 404);
     }
 
-    if (path === "/reset" && request.method === "POST") {
-      await this.ctx.storage.deleteAll();
-      return json({ ok: true });
-    }
-
     return json({ ok: false, error: "Not found" }, 404);
   }
 }
@@ -120,11 +115,6 @@ export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "";
     if (request.method === "OPTIONS") return corsPreflight(request);
-
-    const supplied = request.headers.get("X-KASA-Key") || "";
-    const expected = String(env.KASA_API_KEY || "");
-    if (!expected) return json({ ok: false, error: "서버 연결 키가 설정되지 않았습니다." }, 500, origin);
-    if (!supplied || supplied !== expected) return json({ ok: false, error: "연결 키가 올바르지 않습니다." }, 401, origin);
 
     const stub = env.KASA_RELAY.getByName("sungwoo-main");
     const response = await stub.fetch(request);
