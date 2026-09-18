@@ -193,7 +193,7 @@ function renderPriceCard(c){
   html+=renderRules('참고 가격 / 조건',details.filter(x=>(x.tone||'info')==='info'));
   const adjustments=Array.isArray(c.adjustments)?c.adjustments.filter(Boolean):[];
   if(adjustments.length){
-    html+='<div class="pc-section"><div class="pc-section-title">가격 조정</div><div class="adjust-wrap">'+adjustments.map(a=>{const val=String(a.value||'');const cls=val.trim().startsWith('-')?'minus':(val.trim().startsWith('+')?'plus':'');return '<span class="adjust-chip '+cls+'">'+esc(a.label||'')+' : <b>'+esc(val)+'</b></span>'}).join('')+'</div></div>';
+    html+='<div class="pc-section"><div class="adjust-wrap">'+adjustments.map(a=>{const val=String(a.value||'');const cls=val.trim().startsWith('-')?'minus':(val.trim().startsWith('+')?'plus':'');return '<span class="adjust-chip '+cls+'">'+esc(a.label||'')+' : <b>'+esc(val)+'</b></span>'}).join('')+'</div></div>';
   }
   html+=renderRules('특수 상태',details.filter(x=>x.tone==='special'));
   if(c.notice)html+='<div class="notice">⚠ '+esc(c.notice)+'</div>';
@@ -273,7 +273,7 @@ async function lookup(){
   btn.disabled=true;
   try{
     setStatus('조회 요청 전송 중…');
-    const r=await api('/request',{method:'POST',body:JSON.stringify({plate,source:'github-mobile-v0.9.2'})});
+    const r=await api('/request',{method:'POST',body:JSON.stringify({plate,source:'github-mobile-v0.9.3'})});
     const id=String(r.requestId||'');
     if(!id)throw new Error('서버에서 requestId를 받지 못했습니다.');
 
