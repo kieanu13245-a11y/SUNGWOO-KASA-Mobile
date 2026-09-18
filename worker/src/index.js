@@ -1,3 +1,5 @@
+import { DurableObject } from "cloudflare:workers";
+
 const ALLOWED_ORIGIN = "https://kieanu13245-a11y.github.io";
 const MAX_AGE_MS = 10 * 60 * 1000;
 
