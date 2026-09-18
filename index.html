@@ -175,7 +175,7 @@ async function lookup(){
   btn.disabled=true;
   try{
     setStatus('조회 요청 전송 중…');
-    const r=await api('/request',{method:'POST',body:JSON.stringify({plate,source:'github-mobile-v0.8.1'})});
+    const r=await api('/request',{method:'POST',body:JSON.stringify({plate,source:'github-mobile-v0.8.2'})});
     const id=String(r.requestId||'');
     if(!id)throw new Error('서버에서 requestId를 받지 못했습니다.');
 
