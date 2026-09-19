@@ -25,7 +25,7 @@
 <div id="result" class="card hidden"></div>
 <div class="card">
   <div class="collapse-head">
-    <div><b>오늘 조회 내역</b><div id="historyMeta" class="muted" style="margin-top:3px">불러오는 중…</div></div>
+    <div><b>오늘 조회 내역</b><div id="historyMeta" class="muted" style="margin-top:3px">열어서 확인</div></div>
     <div class="collapse-actions"><button id="toggleHistory" class="toggle-btn">열기</button></div>
   </div>
   <div id="historyBody" class="collapse-body hidden">
@@ -281,7 +281,7 @@ async function lookup(){
   btn.disabled=true;
   try{
     setStatus('조회 요청 전송 중…');
-    const r=await api('/request',{method:'POST',body:JSON.stringify({plate,source:'github-mobile-v0.9.5'})});
+    const r=await api('/request',{method:'POST',body:JSON.stringify({plate,source:'github-mobile-v0.9.6'})});
     const id=String(r.requestId||'');
     if(!id)throw new Error('서버에서 requestId를 받지 못했습니다.');
 
@@ -325,6 +325,8 @@ const dbMeta=window.SUNGWOO_PRICE_DB_META||{};
 $('#priceDbMeta').textContent=(dbMeta.count||Object.keys(window.SUNGWOO_PRICE_DB||{}).length)+'개 가격카드 · 기준일 '+(dbMeta.effectiveDate||'-')+' · 알루미늄휠 가격';
 setupCollapse('#toggleHistory','#historyBody');
 setupCollapse('#toggleServer','#serverBody');
+$('#toggleHistory').addEventListener('click',()=>{if(!$('#historyBody').classList.contains('hidden'))loadHistory();});
+$('#toggleServer').addEventListener('click',()=>{if(!$('#serverBody').classList.contains('hidden'))refreshServerStatus();});
 $('#lookup').onclick=lookup;
 $('#modelSearchBtn').onclick=runModelSearch;
 $('#modelQuery').addEventListener('input',e=>renderModelMatches(e.target.value));
@@ -334,8 +336,6 @@ $('#plate').addEventListener('keydown',e=>{if(e.key==='Enter')lookup()});
 $('#refreshHistory').onclick=()=>loadHistory();
 $('#historyList').addEventListener('click',e=>{const b=e.target.closest('[data-hi]');if(!b)return;const item=historyItems[Number(b.dataset.hi)];if(item){render(item,true);$('#result').scrollIntoView({behavior:'smooth',block:'start'});}});
 refreshServerStatus();
-loadHistory();
-setInterval(refreshServerStatus,5000);
-setInterval(loadHistory,30000);
+setInterval(refreshServerStatus,15000);
 })();
 </script></body></html>
