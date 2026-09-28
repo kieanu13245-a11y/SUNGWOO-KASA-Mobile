@@ -207,12 +207,37 @@ function renderPriceCard(c){
   if(c.notice)html+='<div class="notice">⚠ '+esc(c.notice)+'</div>';
   return html;
 }
+function vehiclePriceOverride(v){
+  const car=String(v?.['차명']||'').toUpperCase();
+  const engine=String(v?.['원동기형식']||'').toUpperCase().replace(/\s+/g,'');
+  const fuel=String(v?.['연료']||'').toUpperCase();
+
+  // 그랜저 HG는 2011년 경계에서 TG와 겹치므로 연식보다 확인 가능한 엔진코드를 우선한다.
+  // G6DG = HG/K7 가솔린 3.0 가격카드. 서버의 일반 "그랜저" 매칭보다 이 판정을 우선 적용.
+  if((car.includes('그랜저')||car.includes('GRANDEUR')) && engine.includes('G6DG') && /(휘발유|가솔린|GASOLINE)/.test(fuel)){
+    const key='그랜저 HG/K7 가솔린 3.0';
+    const row=window.SUNGWOO_PRICE_DB?.[key];
+    if(row){
+      const card=compactDbCard(key,row);
+      card.title='그랜저 HG 3.0 GDI';
+      card.notice=[card.notice,'원동기 G6DG 기준 · HG 3.0 우선 판정'].filter(Boolean).join(' · ');
+      return card;
+    }
+  }
+  return null;
+}
+function resolvedVehiclePriceCard(d,v){
+  return vehiclePriceOverride(v)
+    || d.priceCard
+    || (Array.isArray(d.priceCandidates)?d.priceCandidates[0]?.priceCard:null)
+    || legacyPriceCard(d);
+}
 function render(d,fromHistory=false){
   if(d.status!=='ok'){setStatus('조회 실패 · '+(d.error||'알 수 없는 오류'),'bad');return}
   const v=d.vehicle||{};
   const isStarex=String(v['차명']||'').includes('스타렉스');
   const regHtml=(isStarex&&v['최초등록일'])?'<div class="kv"><small>최초등록일</small><b>'+esc(v['최초등록일'])+'</b></div>':'';
-  $('#result').innerHTML='<div class="plate">'+esc(v['등록번호']||d.plate||'-')+'</div><div class="car">'+esc(v['차명']||'차명 없음')+'</div><div class="grid"><div class="kv"><small>연식</small><b>'+esc(v['연식']||'-')+'</b></div><div class="kv"><small>주행거리</small><b>'+esc(v['주행거리']||'-')+'</b></div><div class="kv"><small>연료</small><b>'+esc(v['연료']||'-')+'</b></div><div class="kv"><small>엔진</small><b>'+esc(v['원동기형식']||'-')+'</b></div>'+regHtml+'</div><div class="muted" style="margin-top:10px">VIN '+esc(v['차대번호']||'-')+' · '+esc(v['색상']||'')+'</div>'+renderPriceCard(d.priceCard||(Array.isArray(d.priceCandidates)?d.priceCandidates[0]?.priceCard:null)||legacyPriceCard(d));
+  $('#result').innerHTML='<div class="plate">'+esc(v['등록번호']||d.plate||'-')+'</div><div class="car">'+esc(v['차명']||'차명 없음')+'</div><div class="grid"><div class="kv"><small>연식</small><b>'+esc(v['연식']||'-')+'</b></div><div class="kv"><small>주행거리</small><b>'+esc(v['주행거리']||'-')+'</b></div><div class="kv"><small>연료</small><b>'+esc(v['연료']||'-')+'</b></div><div class="kv"><small>엔진</small><b>'+esc(v['원동기형식']||'-')+'</b></div>'+regHtml+'</div><div class="muted" style="margin-top:10px">VIN '+esc(v['차대번호']||'-')+' · '+esc(v['색상']||'')+'</div>'+renderPriceCard(resolvedVehiclePriceCard(d,v));
   $('#result').classList.remove('hidden');
   setStatus(fromHistory?'오늘 조회 내역을 불러왔습니다.':'조회 완료 · NAS KASA 결과를 받았습니다.','ok');
 }
@@ -281,7 +306,7 @@ async function lookup(){
   btn.disabled=true;
   try{
     setStatus('조회 요청 전송 중…');
-    const r=await api('/request',{method:'POST',body:JSON.stringify({plate,source:'github-mobile-v0.9.6'})});
+    const r=await api('/request',{method:'POST',body:JSON.stringify({plate,source:'github-mobile-v0.9.7'})});
     const id=String(r.requestId||'');
     if(!id)throw new Error('서버에서 requestId를 받지 못했습니다.');
 
