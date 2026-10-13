@@ -44,7 +44,7 @@
   </div>
 </div>
 </div>
-<script src="price-db.js?v=5"></script>
+<script src="price-db.js?v=6"></script>
 <script>
 (()=>{
 const API_URL='https://sungwoo-kasa-relay.kieanu13245.workers.dev';
@@ -215,7 +215,7 @@ function vehiclePriceOverride(v){
   // 그랜저 HG는 2011년 경계에서 TG와 겹치므로 연식보다 확인 가능한 엔진코드를 우선한다.
   // G6DG = HG/K7 가솔린 3.0 가격카드. 서버의 일반 "그랜저" 매칭보다 이 판정을 우선 적용.
   if((car.includes('그랜저')||car.includes('GRANDEUR')) && engine.includes('G6DG') && /(휘발유|가솔린|GASOLINE)/.test(fuel)){
-    const key='그랜저 HG/K7 가솔린 3.0';
+    const key='그랜저 HG 가솔린 3.0';
     const row=window.SUNGWOO_PRICE_DB?.[key];
     if(row){
       const card=compactDbCard(key,row);
