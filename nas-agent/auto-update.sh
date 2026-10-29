@@ -23,6 +23,15 @@ trap 'rm -rf "$LOCK" "$TMP" 2>/dev/null || true' EXIT INT TERM
 TMP="$(mktemp -d /tmp/sungwoo-kasa-update.XXXXXX)"
 MANIFEST="$TMP/version.json"
 
+# updater 자체도 최신본으로 동기화. 현재 실행은 계속하고 다음 실행부터 새 스크립트를 사용한다.
+if curl -fsSL --connect-timeout 10 --max-time 30 "$BASE/auto-update.sh?ts=$(date +%s)" -o "$TMP/auto-update.sh.remote"; then
+  if [ ! -f "$ROOT/auto-update.sh" ] || ! cmp -s "$TMP/auto-update.sh.remote" "$ROOT/auto-update.sh"; then
+    cp "$TMP/auto-update.sh.remote" "$ROOT/auto-update.sh"
+    chmod 755 "$ROOT/auto-update.sh"
+    log "업데이터 스크립트 최신화"
+  fi
+fi
+
 curl -fsSL --connect-timeout 10 --max-time 30 "$BASE/version.json?ts=$(date +%s)" -o "$MANIFEST"
 
 REMOTE_VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$MANIFEST" | head -1)"
