@@ -1,0 +1,7 @@
+{
+  "version": "0.2.9",
+  "effectiveDate": "2026-10-30",
+  "payload": "latest.tar.gz.b64",
+  "sha256": "ebd46fcf38184f173e1c27942f319f7abfe10c9fb0f98f2b0d6b8aafcfbfaa11",
+  "files": ["agent.js", "price_rules.json"]
+}
