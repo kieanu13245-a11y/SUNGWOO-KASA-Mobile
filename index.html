@@ -66,8 +66,14 @@ async function refreshServerStatus(){
       return;
     }
     if(!s.kasaReady){
-      setServerBadge('로그인 필요','warn');
-      $('#serverDetail').textContent='NAS 연결됨 · KASA 로그인/화면 확인 필요';
+      const err=String(s.lastError||'');
+      if(/자동로그인 실패|로그인 필요|로그인 화면|세션 만료/i.test(err)){
+        setServerBadge('로그인 필요','warn');
+        $('#serverDetail').textContent='NAS 연결됨 · '+(err||'KASA 로그인 확인 필요');
+      }else{
+        setServerBadge('KASA 확인 중','busy');
+        $('#serverDetail').textContent='NAS 연결됨 · '+(err||'KASA 화면 상태 확인/복구 중');
+      }
       return;
     }
     if(s.busy){
