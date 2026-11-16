@@ -240,6 +240,11 @@ function resolvedVehiclePriceCard(d,v){
     || legacyPriceCard(d);
 }
 
+// 과세번호는 서버 기록에 유지하고 모바일 화면에서만 숨긴다.
+function displaySeizureDetail(raw){
+  const s=String(raw??'').replace(/\s+/g,' ').trim();
+  return s.replace(/\s*[(（\[]?\s*과세\s*번호\s*[:：]?[^\n]*$/i,'').replace(/[\s(（\[|,;:-]+$/g,'').trim();
+}
 function renderSeizures(d){
   const v=d?.vehicle||{};
   // NAS Agent는 압류 행을 seizures 배열로 보내며, 이전 조회 기록의 한국어 필드도 지원한다.
@@ -256,7 +261,7 @@ function renderSeizures(d){
   let content='';
   if(rows.length){
     content='<div class="seizure-scroll"><table class="seizure-table"><thead><tr><th>구분</th><th>채권자</th><th>압류 내역</th></tr></thead><tbody>'+
-      rows.map(x=>'<tr><td>'+esc(x.kind)+'</td><td>'+esc(x.creditor||'-')+'</td><td>'+esc(x.detail||'-')+'</td></tr>').join('')+
+      rows.map(x=>'<tr><td>'+esc(x.kind)+'</td><td>'+esc(x.creditor||'-')+'</td><td>'+esc(displaySeizureDetail(x.detail)||'-')+'</td></tr>').join('')+
       '</tbody></table></div>';
   }else if(count===0 || (Array.isArray(raw)&&count==null)){
     content='<div class="seizure-empty">압류 없음</div>';
